@@ -4,10 +4,7 @@ import com.rhe.trading.agg.model.etrm.EtrmTradeHeader;
 import com.rhe.trading.agg.model.etrm.EtrmTradeLeg;
 import com.rhe.trading.agg.model.etrm.EtrmTradeLegKey;
 import com.rhe.trading.agg.model.etrm.EtrmTransaction;
-import io.debezium.data.Envelope;
-import io.debezium.data.SchemaUtil;
 import io.debezium.serde.DebeziumSerdes;
-import org.apache.kafka.common.protocol.types.Schema;
 import org.apache.kafka.common.serialization.Serde;
 import org.apache.kafka.streams.StreamsBuilder;
 import org.apache.kafka.streams.Topology;
@@ -19,7 +16,6 @@ import org.slf4j.LoggerFactory;
 
 import javax.enterprise.context.ApplicationScoped;
 import javax.enterprise.inject.Produces;
-import javax.transaction.Status;
 import java.util.Collections;
 import java.util.List;
 

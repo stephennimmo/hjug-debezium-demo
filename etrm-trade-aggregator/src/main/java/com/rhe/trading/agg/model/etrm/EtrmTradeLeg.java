@@ -1,7 +1,6 @@
 package com.rhe.trading.agg.model.etrm;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
-import org.apache.kafka.connect.data.Decimal;
 
 import java.math.BigDecimal;
 import java.util.Objects;

@@ -2,7 +2,6 @@ package com.rhe.trading.agg.model.etrm;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 
-import java.math.BigDecimal;
 import java.util.Objects;
 
 public class EtrmTradeLegKey {
