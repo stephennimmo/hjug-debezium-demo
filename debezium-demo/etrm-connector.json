@@ -1,0 +1,26 @@
+{
+    "name": "etrm-connector",
+    "config": {
+      "connector.class": "io.debezium.connector.postgresql.PostgresConnector",
+      "plugin.name": "pgoutput",
+      "database.server.name": "etrm",
+      "database.hostname": "postgres",
+      "database.port": "5432",
+      "database.user": "admin",
+      "database.password": "password",
+      "database.dbname" : "etrm",
+      "provide.transaction.metadata": true,
+      "topic.prefix": "etrm",
+      "topic.transaction": "transaction",
+      "table.include.list": "public.legal_entity_type, public.legal_entity, public.uom, public.currency, public.trade_type, public.trade_header, public.trade_leg",
+      "message.key.columns": "public.legal_entity_type:legal_entity_type_id;public.legal_entity:legal_entity_id;public.uom:uom_id;public.currency:currency_id;public.trade_type:trade_type_id;public.trade_header:trade_id;public.trade_leg:trade_leg_id,trade_id",
+      "topic.creation.enable": true,
+      "topic.creation.default.replication.factor": 1,
+      "topic.creation.default.partitions": 3,
+      "key.converter": "org.apache.kafka.connect.json.JsonConverter",
+      "key.converter.schemas.enable": "false",
+      "value.converter": "org.apache.kafka.connect.json.JsonConverter",
+      "value.converter.schemas.enable": "false",
+      "decimal.handling.mode": "string"
+    }
+  }
