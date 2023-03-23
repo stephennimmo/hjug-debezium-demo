@@ -6,14 +6,13 @@ import com.rhe.trading.agg.model.etrm.EtrmTradeLegKey;
 import com.rhe.trading.agg.model.etrm.EtrmTransaction;
 import io.debezium.serde.DebeziumSerdes;
 import org.apache.kafka.common.serialization.Serde;
-import org.apache.kafka.streams.kstream.KStream;
 
 import javax.enterprise.context.ApplicationScoped;
 import javax.enterprise.inject.Produces;
 import java.util.Collections;
 
 @ApplicationScoped
-public class SerdeStreamTableProducer {
+public class SerdeProducer {
 
     @Produces
     Serde<String> etrmTransactionKeySerde() {

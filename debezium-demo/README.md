@@ -121,6 +121,10 @@ VALUES ((select trade_id from new_trade), 1, 2, 1, 1, 2.84, 1, 10000, 1),
 COMMIT;
 ```
 
+```
+UPDATE trade_leg SET price = 3.85 WHERE trade_leg_id = 110;
+```
+
 
 # Cleanup
 ```
