@@ -2,7 +2,11 @@ package com.rhe.trading.agg;
 
 import com.rhe.trading.agg.model.etrm.*;
 import io.debezium.serde.DebeziumSerdes;
+import io.quarkus.kafka.client.serialization.JsonbSerde;
+import io.quarkus.kafka.client.serialization.ObjectMapperSerde;
 import org.apache.kafka.common.serialization.Serde;
+import org.apache.kafka.common.serialization.Serdes;
+import org.apache.kafka.streams.KeyValue;
 import org.apache.kafka.streams.StreamsBuilder;
 import org.apache.kafka.streams.Topology;
 import org.apache.kafka.streams.kstream.*;
@@ -51,6 +55,21 @@ public class AggregatedTradeProducer {
 
         KStream<EtrmTradeLegKey, EtrmTradeLegEnvelope> etrmTradeLegEnvelopeKStream = streamsBuilder.stream("etrm.public.trade_leg", Consumed.with(etrmTradeLegKeySerde, etrmTradeLegEnvelopeSerde))
                 .peek((key, envelope) -> LOGGER.info("{}, {}", key, envelope));
+
+        Serde<TradeIdAndTransactionId> tradeIdAndTransactionIdSerde = new ObjectMapperSerde(TradeIdAndTransactionId.class);
+        Serde<EtrmTradeHeader> etrmTradeHeaderSerde = new ObjectMapperSerde(EtrmTradeHeader.class);
+
+        KTable<TradeIdAndTransactionId, EtrmTradeHeader> etrmTradeHeaderEnvelopeKTable = etrmTradeHeaderEnvelopeKStream
+                .map((integer, etrmTradeHeaderEnvelope) -> {
+                    int tradeId = etrmTradeHeaderEnvelope.getAfter().tradeId();
+                    String transactionIdString = etrmTradeHeaderEnvelope.getTransaction().id();
+                    int transactionId = Integer.parseInt(transactionIdString.substring(0, transactionIdString.indexOf(':')));
+                    TradeIdAndTransactionId tradeIdAndTransactionId = new TradeIdAndTransactionId(tradeId, transactionId);
+                    return new KeyValue<>(tradeIdAndTransactionId, etrmTradeHeaderEnvelope.getAfter());
+                })
+                .toTable(Materialized.with(tradeIdAndTransactionIdSerde, etrmTradeHeaderSerde));
+
+        etrmTradeHeaderEnvelopeKTable.toStream().peek((key, envelope) -> LOGGER.info("TABLE: {}, {}", key, envelope));
 
         return streamsBuilder.build();
     }
