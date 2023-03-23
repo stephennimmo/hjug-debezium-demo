@@ -31,7 +31,18 @@ public class AggregatedTradeProducer {
         etrmTransactionSerde.configure(Collections.emptyMap(), false);
 
         KStream<String, EtrmTransaction> etrmTransactionKStream = streamsBuilder.stream("etrm.transaction", Consumed.with(etrmTransactionKeySerde, etrmTransactionSerde))
-                .peek((s, etrmTransaction) -> LOGGER.info("{}, {}", s, etrmTransaction));
+                .peek((s, etrmTransaction) -> LOGGER.info("ALL: {}, {}", s, etrmTransaction))
+                .filter((s, etrmTransaction) -> etrmTransaction.status().equals("END"))
+                .filter((s, etrmTransaction) -> etrmTransaction.dataCollections().stream().filter(dataCollection -> TRADE_TABLES.contains(dataCollection.dataCollection())).count() > 0)
+                .peek((s, etrmTransaction) -> LOGGER.info("FILTERED: {}", etrmTransaction));
+
+        Serde<Integer> integerSerde = DebeziumSerdes.payloadJson(Integer.class);
+        integerSerde.configure(Collections.emptyMap(), true);
+        Serde<EtrmTradeHeaderEnvelope> etrmTradeHeaderEnvelopeSerde = DebeziumSerdes.payloadJson(EtrmTradeHeaderEnvelope.class);
+        etrmTradeHeaderEnvelopeSerde.configure(Collections.singletonMap("unknown.properties.ignored", true), false);
+
+        KStream<Integer, EtrmTradeHeaderEnvelope> etrmTradeHeaderEnvelopeKStream = streamsBuilder.stream("etrm.public.trade_header", Consumed.with(integerSerde, etrmTradeHeaderEnvelopeSerde))
+                .peek((key, envelope) -> LOGGER.info("{}, {}", key, envelope));
 
         Serde<EtrmTradeLegKey> etrmTradeLegKeySerde = DebeziumSerdes.payloadJson(EtrmTradeLegKey.class);
         etrmTradeLegKeySerde.configure(Collections.emptyMap(), true);

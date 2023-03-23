@@ -21,65 +21,6 @@ public class ChangeEventEnvelope<T> {
     @JsonProperty("transaction")
     private Transaction transaction;
 
-    private static class Transaction {
-
-        @JsonProperty("id")
-        private String id;
-
-        @JsonProperty("total_order")
-        private int totalOrder;
-
-        @JsonProperty("data_collection_order")
-        private int dataCollectionOrder;
-
-        public String getId() {
-            return id;
-        }
-
-        public void setId(String id) {
-            this.id = id;
-        }
-
-        public int getTotalOrder() {
-            return totalOrder;
-        }
-
-        public void setTotalOrder(int totalOrder) {
-            this.totalOrder = totalOrder;
-        }
-
-        public int getDataCollectionOrder() {
-            return dataCollectionOrder;
-        }
-
-        public void setDataCollectionOrder(int dataCollectionOrder) {
-            this.dataCollectionOrder = dataCollectionOrder;
-        }
-
-        @Override
-        public boolean equals(Object o) {
-            if (this == o) return true;
-            if (o == null || getClass() != o.getClass()) return false;
-            Transaction that = (Transaction) o;
-            return totalOrder == that.totalOrder && dataCollectionOrder == that.dataCollectionOrder && Objects.equals(id, that.id);
-        }
-
-        @Override
-        public int hashCode() {
-            return Objects.hash(id, totalOrder, dataCollectionOrder);
-        }
-
-        @Override
-        public String toString() {
-            return "Transaction{" +
-                    "id='" + id + '\'' +
-                    ", totalOrder=" + totalOrder +
-                    ", dataCollectionOrder=" + dataCollectionOrder +
-                    '}';
-        }
-
-    }
-
     public T getBefore() {
         return before;
     }
