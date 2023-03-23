@@ -24,6 +24,15 @@ public class AggregatedTradeProducer {
     @Produces
     public Topology build() {
         StreamsBuilder streamsBuilder = new StreamsBuilder();
+
+        Serde<String> etrmTransactionKeySerde = DebeziumSerdes.payloadJson(String.class);
+        etrmTransactionKeySerde.configure(Collections.emptyMap(), true);
+        Serde<EtrmTransaction> etrmTransactionSerde = DebeziumSerdes.payloadJson(EtrmTransaction.class);
+        etrmTransactionSerde.configure(Collections.emptyMap(), false);
+
+        KStream<String, EtrmTransaction> etrmTransactionKStream = streamsBuilder.stream("etrm.transaction", Consumed.with(etrmTransactionKeySerde, etrmTransactionSerde))
+                .peek((s, etrmTransaction) -> LOGGER.info("{}, {}", s, etrmTransaction));
+
         Serde<EtrmTradeLegKey> etrmTradeLegKeySerde = DebeziumSerdes.payloadJson(EtrmTradeLegKey.class);
         etrmTradeLegKeySerde.configure(Collections.emptyMap(), true);
         Serde<EtrmTradeLegEnvelope> etrmTradeLegEnvelopeSerde = DebeziumSerdes.payloadJson(EtrmTradeLegEnvelope.class);
