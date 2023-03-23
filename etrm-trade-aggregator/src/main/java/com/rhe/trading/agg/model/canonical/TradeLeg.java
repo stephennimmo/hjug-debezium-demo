@@ -1,15 +1,11 @@
-package com.rhe.trading.agg.model.etrm;
-
-import com.fasterxml.jackson.annotation.JsonProperty;
+package com.rhe.trading.agg.model.canonical;
 
 import java.util.Objects;
 
-public class EtrmTradeLegKey {
+public class TradeLeg {
 
-    @JsonProperty("trade_leg_id")
     private int tradeLegId;
 
-    @JsonProperty("trade_id")
     private int tradeId;
 
     public int getTradeLegId() {
@@ -32,8 +28,8 @@ public class EtrmTradeLegKey {
     public boolean equals(Object o) {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
-        EtrmTradeLegKey that = (EtrmTradeLegKey) o;
-        return tradeLegId == that.tradeLegId && tradeId == that.tradeId;
+        TradeLeg tradeLeg = (TradeLeg) o;
+        return tradeLegId == tradeLeg.tradeLegId && tradeId == tradeLeg.tradeId;
     }
 
     @Override
@@ -43,7 +39,7 @@ public class EtrmTradeLegKey {
 
     @Override
     public String toString() {
-        return "EtrmTradeLegKey{" +
+        return "TradeLeg{" +
                 "tradeLegId=" + tradeLegId +
                 ", tradeId=" + tradeId +
                 '}';
