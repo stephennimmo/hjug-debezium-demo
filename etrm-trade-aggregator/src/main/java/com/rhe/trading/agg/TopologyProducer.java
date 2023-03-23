@@ -1,5 +1,6 @@
 package com.rhe.trading.agg;
 
+import com.rhe.trading.agg.model.canonical.Trade;
 import com.rhe.trading.agg.model.etrm.*;
 import io.quarkus.kafka.client.serialization.ObjectMapperSerde;
 import org.apache.kafka.common.serialization.Serde;
@@ -23,19 +24,17 @@ public class TopologyProducer {
 
     private static final List<String> TRADE_TABLES = List.of("public.trade_header", "public.trade_leg");
 
+    private final Serde<Integer> integerSerde;
     private final Serde<String> etrmTransactionKeySerde;
     private final Serde<EtrmTransaction> etrmTransactionSerde;
-    private final Serde<Integer> etrmTradeHeaderEnvelopeKeySerde;
     private final Serde<EtrmTradeHeaderEnvelope> etrmTradeHeaderEnvelopeSerde;
-    private final Serde<EtrmTradeLegKey> etrmTradeLegKeySerde;
     private final Serde<EtrmTradeLegEnvelope> etrmTradeLegEnvelopeSerde;
 
-    public TopologyProducer(Serde<String> etrmTransactionKeySerde, Serde<EtrmTransaction> etrmTransactionSerde, Serde<Integer> etrmTradeHeaderEnvelopeKeySerde, Serde<EtrmTradeHeaderEnvelope> etrmTradeHeaderEnvelopeSerde, Serde<EtrmTradeLegKey> etrmTradeLegKeySerde, Serde<EtrmTradeLegEnvelope> etrmTradeLegEnvelopeSerde) {
+    public TopologyProducer(Serde<Integer> integerSerde, Serde<String> etrmTransactionKeySerde, Serde<EtrmTransaction> etrmTransactionSerde, Serde<EtrmTradeHeaderEnvelope> etrmTradeHeaderEnvelopeSerde, Serde<EtrmTradeLegEnvelope> etrmTradeLegEnvelopeSerde) {
+        this.integerSerde = integerSerde;
         this.etrmTransactionKeySerde = etrmTransactionKeySerde;
         this.etrmTransactionSerde = etrmTransactionSerde;
-        this.etrmTradeHeaderEnvelopeKeySerde = etrmTradeHeaderEnvelopeKeySerde;
         this.etrmTradeHeaderEnvelopeSerde = etrmTradeHeaderEnvelopeSerde;
-        this.etrmTradeLegKeySerde = etrmTradeLegKeySerde;
         this.etrmTradeLegEnvelopeSerde = etrmTradeLegEnvelopeSerde;
     }
 
@@ -49,29 +48,35 @@ public class TopologyProducer {
                 .filter((s, etrmTransaction) -> etrmTransaction.dataCollections().stream().filter(dataCollection -> TRADE_TABLES.contains(dataCollection.dataCollection())).count() > 0)
                 .peek((s, etrmTransaction) -> LOGGER.info("FILTERED TRANSACTIONS: {}", etrmTransaction));
 
-        KStream<Integer, EtrmTradeHeaderEnvelope> etrmTradeHeaderEnvelopeKStream = streamsBuilder.stream("etrm.public.trade_header", Consumed.with(etrmTradeHeaderEnvelopeKeySerde, etrmTradeHeaderEnvelopeSerde))
+        KStream<Integer, EtrmTradeHeaderEnvelope> etrmTradeHeaderEnvelopeKStream = streamsBuilder.stream("etrm.public.trade_header", Consumed.with(integerSerde, etrmTradeHeaderEnvelopeSerde))
                 .peek((key, envelope) -> LOGGER.info("ETRMTRADEHEADERENVELOPEKSTREAM: {}, {}", key, envelope));
 
-        KStream<EtrmTradeLegKey, EtrmTradeLegEnvelope> etrmTradeLegEnvelopeKStream = streamsBuilder.stream("etrm.public.trade_leg", Consumed.with(etrmTradeLegKeySerde, etrmTradeLegEnvelopeSerde))
+        KStream<Integer, EtrmTradeLegEnvelope> etrmTradeLegEnvelopeKStream = streamsBuilder.stream("etrm.public.trade_leg", Consumed.with(integerSerde, etrmTradeLegEnvelopeSerde))
                 .peek((key, envelope) -> LOGGER.info("ETRMTRADELEGENVELOPEKSTREAM: {}, {}", key, envelope));
 
         // NEW STUFF
         Serde<EtrmTradeLeg> etrmTradeLegSerde = new ObjectMapperSerde<>(EtrmTradeLeg.class);
-        Serde<EtrmTradeLegAggregation> etrmTradeLegAggregationSerde = new ObjectMapperSerde(EtrmTradeLegAggregation.class);
-
-        KGroupedStream<Integer, EtrmTradeLeg> etrmTradeLegKeyEtrmTradeLegEnvelopeKGroupedStream = etrmTradeLegEnvelopeKStream
-                .map((etrmTradeLegKey, etrmTradeLegEnvelope) -> new KeyValue<>(etrmTradeLegKey.tradeId(), etrmTradeLegEnvelope.getAfter()))
-                .groupByKey(Grouped.with(Serdes.Integer(), etrmTradeLegSerde));
-        KTable<Integer, EtrmTradeLegAggregation> etrmTradeLegAggregationKTable = etrmTradeLegKeyEtrmTradeLegEnvelopeKGroupedStream.aggregate(
-                () -> new EtrmTradeLegAggregation(new ArrayList<>()),
-                (integer, etrmTradeLeg, aggregation) -> {
-                    aggregation.tradeLegs().add(etrmTradeLeg);
-                    return aggregation;
-                },
-                Materialized.with(Serdes.Integer(), etrmTradeLegAggregationSerde));
-        etrmTradeLegAggregationKTable.toStream().peek((key, aggregation) -> LOGGER.info("etrmTradeLegAggregationKTable: {}, {}", key, aggregation));
+        Serde<EtrmTradeLegAggregation> etrmTradeLegAggregationSerde = new ObjectMapperSerde<>(EtrmTradeLegAggregation.class);
+        KTable<Integer, EtrmTradeLegAggregation> etrmTradeLegAggregationKTable = etrmTradeLegEnvelopeKStream
+                .map((integer, etrmTradeLegEnvelope) -> new KeyValue<>(this.getTradeId(etrmTradeLegEnvelope), etrmTradeLegEnvelope))
+                .groupByKey(Grouped.with(Serdes.Integer(), etrmTradeLegEnvelopeSerde))
+                .aggregate(
+                        EtrmTradeLegAggregation::new,
+                        (integer, etrmTradeLegEnvelope, aggregation) -> aggregation.update(etrmTradeLegEnvelope),
+                        Materialized.with(Serdes.Integer(), etrmTradeLegAggregationSerde)
+                );
+        etrmTradeLegAggregationKTable.toStream().peek((k, v) -> LOGGER.info("TradeLegAggregation: {}, {}", k, v));
 
         return streamsBuilder.build();
+    }
+
+    private int getTradeId(EtrmTradeLegEnvelope envelope) {
+        if (envelope.getAfter() != null) {
+            return envelope.getAfter().tradeId();
+        } else if (envelope.getBefore() != null) {
+            return envelope.getBefore().tradeId();
+        }
+        throw new RuntimeException("Before and After are null");
     }
 
     /*
@@ -100,6 +105,23 @@ public class TopologyProducer {
         KTable<Integer, EtrmTradeLegAggregation> aggregate =
 
         aggregate.toStream().peek((key, aggregation) -> LOGGER.info("AGG: {}, {}", key, aggregation));
+     */
+
+    /*
+    Serde<EtrmTradeLeg> etrmTradeLegSerde = new ObjectMapperSerde<>(EtrmTradeLeg.class);
+        Serde<EtrmTradeLegAggregation> etrmTradeLegAggregationSerde = new ObjectMapperSerde(EtrmTradeLegAggregation.class);
+
+        KGroupedStream<Integer, EtrmTradeLeg> etrmTradeLegKeyEtrmTradeLegEnvelopeKGroupedStream = etrmTradeLegEnvelopeKStream
+                .map((etrmTradeLegKey, etrmTradeLegEnvelope) -> new KeyValue<>(etrmTradeLegKey.tradeId(), etrmTradeLegEnvelope.getAfter()))
+                .groupByKey(Grouped.with(Serdes.Integer(), etrmTradeLegSerde));
+        KTable<Integer, EtrmTradeLegAggregation> etrmTradeLegAggregationKTable = etrmTradeLegKeyEtrmTradeLegEnvelopeKGroupedStream.aggregate(
+                () -> new EtrmTradeLegAggregation(new ArrayList<>()),
+                (integer, etrmTradeLeg, aggregation) -> {
+                    aggregation.tradeLegs().add(etrmTradeLeg);
+                    return aggregation;
+                },
+                Materialized.with(Serdes.Integer(), etrmTradeLegAggregationSerde));
+        etrmTradeLegAggregationKTable.toStream().peek((key, aggregation) -> LOGGER.info("etrmTradeLegAggregationKTable: {}, {}", key, aggregation));
      */
 
 }

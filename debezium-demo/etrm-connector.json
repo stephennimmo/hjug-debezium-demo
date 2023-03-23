@@ -13,7 +13,7 @@
       "topic.prefix": "etrm",
       "topic.transaction": "transaction",
       "table.include.list": "public.legal_entity_type, public.legal_entity, public.uom, public.currency, public.trade_type, public.trade_header, public.trade_leg",
-      "message.key.columns": "public.legal_entity_type:legal_entity_type_id;public.legal_entity:legal_entity_id;public.uom:uom_id;public.currency:currency_id;public.trade_type:trade_type_id;public.trade_header:trade_id;public.trade_leg:trade_leg_id,trade_id",
+      "message.key.columns": "public.legal_entity_type:legal_entity_type_id;public.legal_entity:legal_entity_id;public.uom:uom_id;public.currency:currency_id;public.trade_type:trade_type_id;public.trade_header:trade_id;public.trade_leg:trade_leg_id",
       "topic.creation.enable": true,
       "topic.creation.default.replication.factor": 1,
       "topic.creation.default.partitions": 3,
@@ -21,6 +21,11 @@
       "key.converter.schemas.enable": "false",
       "value.converter": "org.apache.kafka.connect.json.JsonConverter",
       "value.converter.schemas.enable": "false",
-      "decimal.handling.mode": "string"
+      "decimal.handling.mode": "string",
+      "transforms": "unwrap",
+      "transforms.unwrap.type": "io.debezium.transforms.ExtractNewRecordState",
+      "transforms.unwrap.add.fields": "op,source.txId,source.table,source.ts_ms",
+      "transforms.unwrap.delete.handling.mode": "rewrite",
+      "tombstones.on.delete": "false"
     }
   }

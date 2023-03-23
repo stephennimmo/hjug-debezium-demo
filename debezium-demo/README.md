@@ -88,7 +88,7 @@ bin/kafka-topics.sh --bootstrap-server localhost:9092 --list
 bin/kafka-topics.sh --bootstrap-server localhost:9092 --topic etrm.* --describe
 ```
 ```
-bin/kafka-console-consumer.sh --bootstrap-server localhost:9092 --whitelist '.*etrm.*'  --property print.key=true
+bin/kafka-console-consumer.sh --bootstrap-server localhost:9092 --whitelist '.*etrm.*' --property print.key=true
 
 # --from-beginning 
 ```

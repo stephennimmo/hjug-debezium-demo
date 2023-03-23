@@ -2,7 +2,6 @@ package com.rhe.trading.agg;
 
 import com.rhe.trading.agg.model.etrm.EtrmTradeHeaderEnvelope;
 import com.rhe.trading.agg.model.etrm.EtrmTradeLegEnvelope;
-import com.rhe.trading.agg.model.etrm.EtrmTradeLegKey;
 import com.rhe.trading.agg.model.etrm.EtrmTransaction;
 import io.debezium.serde.DebeziumSerdes;
 import org.apache.kafka.common.serialization.Serde;
@@ -13,6 +12,13 @@ import java.util.Collections;
 
 @ApplicationScoped
 public class SerdeProducer {
+
+    @Produces
+    Serde<Integer> integerSerde() {
+        Serde<Integer> integerSerde = DebeziumSerdes.payloadJson(Integer.class);
+        integerSerde.configure(Collections.emptyMap(), true);
+        return integerSerde;
+    }
 
     @Produces
     Serde<String> etrmTransactionKeySerde() {
@@ -29,24 +35,10 @@ public class SerdeProducer {
     }
 
     @Produces
-    Serde<Integer> etrmTradeHeaderEnvelopeKeySerde() {
-        Serde<Integer> integerSerde = DebeziumSerdes.payloadJson(Integer.class);
-        integerSerde.configure(Collections.emptyMap(), true);
-        return integerSerde;
-    }
-
-    @Produces
     Serde<EtrmTradeHeaderEnvelope> etrmTradeHeaderEnvelopeSerde() {
         Serde<EtrmTradeHeaderEnvelope> etrmTradeHeaderEnvelopeSerde = DebeziumSerdes.payloadJson(EtrmTradeHeaderEnvelope.class);
         etrmTradeHeaderEnvelopeSerde.configure(Collections.singletonMap("unknown.properties.ignored", true), false);
         return etrmTradeHeaderEnvelopeSerde;
-    }
-
-    @Produces
-    Serde<EtrmTradeLegKey> etrmTradeLegKeySerde() {
-        Serde<EtrmTradeLegKey> etrmTradeLegKeySerde = DebeziumSerdes.payloadJson(EtrmTradeLegKey.class);
-        etrmTradeLegKeySerde.configure(Collections.emptyMap(), true);
-        return etrmTradeLegKeySerde;
     }
 
     @Produces
