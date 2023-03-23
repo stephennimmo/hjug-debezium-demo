@@ -1,9 +1,6 @@
 package com.rhe.trading.agg;
 
-import com.rhe.trading.agg.model.etrm.EtrmTradeHeader;
-import com.rhe.trading.agg.model.etrm.EtrmTradeHeaderEnvelope;
-import com.rhe.trading.agg.model.etrm.EtrmTradeLeg;
-import com.rhe.trading.agg.model.etrm.EtrmTransaction;
+import com.rhe.trading.agg.model.etrm.*;
 import io.debezium.serde.DebeziumSerdes;
 import org.apache.kafka.common.serialization.Serde;
 import org.apache.kafka.streams.StreamsBuilder;
@@ -24,6 +21,22 @@ public class AggregatedTradeProducer {
 
     private static final List<String> TRADE_TABLES = List.of("public.trade_header", "public.trade_leg");
 
+    @Produces
+    public Topology build() {
+        StreamsBuilder streamsBuilder = new StreamsBuilder();
+        Serde<EtrmTradeLegKey> etrmTradeLegKeySerde = DebeziumSerdes.payloadJson(EtrmTradeLegKey.class);
+        etrmTradeLegKeySerde.configure(Collections.emptyMap(), true);
+        Serde<EtrmTradeLegEnvelope> etrmTradeLegEnvelopeSerde = DebeziumSerdes.payloadJson(EtrmTradeLegEnvelope.class);
+        etrmTradeLegEnvelopeSerde.configure(Collections.singletonMap("unknown.properties.ignored", true), false);
+
+        KStream<EtrmTradeLegKey, EtrmTradeLegEnvelope> etrmTradeLegEnvelopeKStream = streamsBuilder.stream("etrm.public.trade_leg", Consumed.with(etrmTradeLegKeySerde, etrmTradeLegEnvelopeSerde))
+                .peek((key, envelope) -> LOGGER.info("{}, {}", key, envelope));
+
+        return streamsBuilder.build();
+    }
+
+
+    /*
     @Produces
     public Topology buildTopology() {
         StreamsBuilder streamsBuilder = new StreamsBuilder();
@@ -56,7 +69,10 @@ public class AggregatedTradeProducer {
                 .filter((s, etrmTransaction) -> etrmTransaction.getDataCollections().stream().filter(dataCollection -> TRADE_TABLES.contains(dataCollection.getDataCollection())).count() > 0)
                 .peek((s, etrmTransaction) -> LOGGER.info("FILTERED: {}", etrmTransaction));
 
+
+
         return streamsBuilder.build();
     }
+     */
 
 }
