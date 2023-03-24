@@ -1,5 +1,7 @@
 package com.rhe.trading.agg;
 
+import com.rhe.trading.agg.model.canonical.Trade;
+import com.rhe.trading.agg.model.canonical.TradeLeg;
 import com.rhe.trading.agg.model.etrm.*;
 import io.quarkus.kafka.client.serialization.ObjectMapperSerde;
 import org.apache.kafka.common.serialization.Serde;
@@ -13,6 +15,10 @@ import org.slf4j.LoggerFactory;
 
 import javax.enterprise.context.ApplicationScoped;
 import javax.enterprise.inject.Produces;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.util.List;
+import java.util.stream.Collectors;
 
 @ApplicationScoped
 public class TopologyProducer {
@@ -55,11 +61,31 @@ public class TopologyProducer {
                 (key, value, aggregate) -> aggregate.update(value),
                 Materialized.with(Serdes.Integer(), etrmTradeLegsSerde)
         );
-
         agg.toStream().peek((k, v) -> LOGGER.info("AGG: {}, {}", k, v));
 
+        Serde<Trade> tradeSerde = new ObjectMapperSerde<>(Trade.class);
+        KTable<Integer, Trade> tradeKTable = etrmTradeHeaderKStream.toTable(Materialized.with(Serdes.Integer(), etrmTradeHeaderSerde)).join(
+                agg,
+                (header, legs) -> this.createTrade(header, legs),
+                Materialized.with(Serdes.Integer(), tradeSerde)
+        );
+        tradeKTable.toStream().peek((k, v) -> LOGGER.info("TRADE: {}, {}", k, v));
+
+        tradeKTable.toStream().to("trade", Produced.with(Serdes.Integer(), tradeSerde));
 
         return streamsBuilder.build();
+    }
+
+    private Trade createTrade(EtrmTradeHeader etrmTradeHeader, EtrmTradeLegs etrmTradeLegs) {
+        List<TradeLeg> tradeLegs = etrmTradeLegs.getEtrmTradeLegs().stream().map(this::createTradeLeg).collect(Collectors.toList());
+        return new Trade(etrmTradeHeader.tradeId(), LocalDate.ofEpochDay(etrmTradeHeader.startDate()), LocalDate.ofEpochDay(etrmTradeHeader.endDate()),
+                Instant.ofEpochMilli(etrmTradeHeader.executionTimestamp()), etrmTradeHeader.tradeTypeId(), tradeLegs);
+    }
+
+    private TradeLeg createTradeLeg(EtrmTradeLeg etrmTradeLeg) {
+        return new TradeLeg(etrmTradeLeg.tradeLegId(), etrmTradeLeg.tradeId(), etrmTradeLeg.payerId(), etrmTradeLeg.receiverId(),
+                etrmTradeLeg.commodity_id(), etrmTradeLeg.locationId(), etrmTradeLeg.price(), etrmTradeLeg.priceCurrencyId(),
+                etrmTradeLeg.quantity(), etrmTradeLeg.quantityUomId());
     }
 
     /*

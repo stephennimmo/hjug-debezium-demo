@@ -79,6 +79,7 @@ podman exec -it kafka /bin/bash
 Need to create the transaction topic
 ```
 bin/kafka-topics.sh --bootstrap-server localhost:9092 --create --topic etrm.transaction --partitions 3 --if-not-exists
+bin/kafka-topics.sh --bootstrap-server localhost:9092 --create --topic trade --partitions 3 --if-not-exists
 ```
 
 ```
