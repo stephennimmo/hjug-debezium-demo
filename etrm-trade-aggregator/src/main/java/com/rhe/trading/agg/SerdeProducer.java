@@ -1,9 +1,6 @@
 package com.rhe.trading.agg;
 
-import com.rhe.trading.agg.model.etrm.EtrmTradeHeader;
-import com.rhe.trading.agg.model.etrm.EtrmTradeHeaderKey;
-import com.rhe.trading.agg.model.etrm.EtrmTradeLeg;
-import com.rhe.trading.agg.model.etrm.EtrmTradeLegKey;
+import com.rhe.trading.agg.model.etrm.*;
 import io.debezium.serde.DebeziumSerdes;
 import io.quarkus.kafka.client.serialization.ObjectMapperSerde;
 import org.apache.kafka.common.serialization.Serde;
@@ -14,6 +11,13 @@ import java.util.Collections;
 
 @ApplicationScoped
 public class SerdeProducer {
+
+    @Produces
+    Serde<EtrmTransaction> etrmTransactionSerde() {
+        Serde<EtrmTransaction> serde = DebeziumSerdes.payloadJson(EtrmTransaction.class);
+        serde.configure(Collections.emptyMap(), false);
+        return serde;
+    }
 
     @Produces
     Serde<EtrmTradeHeaderKey> etrmTradeHeaderKeySerde() {

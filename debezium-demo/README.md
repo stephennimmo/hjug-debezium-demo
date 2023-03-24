@@ -56,6 +56,8 @@ Notice we didn't add the `-d` argument. We want to keep an eye on what is happen
 
 Now we need to add the Kafka connector definition for us to connect to the postgres instance and listen to some tables and the transaction logs. 
 
+STOP: Go create the transaction topic...  
+
 ```
 kcctl apply -f etrm-connector.json
 ```
@@ -93,6 +95,9 @@ bin/kafka-console-consumer.sh --bootstrap-server localhost:9092 --whitelist '.*e
 
 # --from-beginning 
 ```
+```
+bin/kafka-console-consumer.sh --bootstrap-server localhost:9092 --whitelist 'trade' --property print.key=true --from-beginning
+```
 
 # Open Database Console and Tests
 
@@ -121,15 +126,24 @@ VALUES ((select trade_id from new_trade), 1, 2, 1, 1, 2.84, 1, 10000, 1),
        ((select trade_id from new_trade), 2, 1, 1, 1, 2.84, 1, 10000, 1);
 COMMIT;
 ```
-
+```
+INSERT INTO trade_leg values (109, 107, 1, 2, 1, 1, 3.92, 1, 10000, 1);
+```
 ```
 UPDATE trade_leg SET price = 3.85 WHERE trade_leg_id = 110;
+```
+```
+UPDATE trade_header SET start_date = CURRENT_DATE - 29 WHERE trade_id = 107;
+```
+```
+DELETE FROM trade_leg WHERE trade_leg_id = 108;
 ```
 
 
 # Cleanup
 ```
-podman-compose down
+podman-compose down  
+podman volume prune
 ```
 
 # Links
@@ -146,3 +160,8 @@ https://debezium.io/blog/2020/02/25/lessons-learned-running-debezium-with-postgr
 
 
 https://debezium.io/documentation/reference/stable/operations/debezium-ui.html
+
+
+state.dir = /var/folders/xp/qkmp9mjj1ns81t9fv9_k85780000gn/T//kafka-streams
+state.dir = /var/folders/xp/qkmp9mjj1ns81t9fv9_k85780000gn/T//kafka-streams
+state.dir = /var/folders/xp/qkmp9mjj1ns81t9fv9_k85780000gn/T//kafka-streams

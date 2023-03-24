@@ -1,16 +1,27 @@
 package com.rhe.trading.agg.model.etrm;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 public class EtrmTradeLegs {
 
-    private List<EtrmTradeLeg> etrmTradeLegs = new ArrayList<>();
+    private List<EtrmTradeLeg> etrmTradeLegs = new CopyOnWriteArrayList<>();
+
+    public EtrmTradeLegs remove(EtrmTradeLeg etrmTradeLeg) {
+        Optional<EtrmTradeLeg> optional = getByTradeLegId(etrmTradeLeg.tradeLegId());
+        if (optional.isPresent()) {
+            etrmTradeLegs.remove(optional.get());
+        }
+        return this;
+    }
 
     public EtrmTradeLegs update(EtrmTradeLeg etrmTradeLeg) {
+        //CAN This be cleaned up?
         switch (etrmTradeLeg.op()) {
-            case "c" -> etrmTradeLegs.add(etrmTradeLeg);
+            case "c" -> {
+                etrmTradeLegs.add(etrmTradeLeg);
+            }
             case "u" -> {
                 Optional<EtrmTradeLeg> optional = getByTradeLegId(etrmTradeLeg.tradeLegId());
                 if (optional.isPresent()) {
