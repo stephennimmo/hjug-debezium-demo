@@ -1,15 +1,13 @@
 package com.rhe.trading.agg;
 
-import com.rhe.trading.agg.model.etrm.EtrmTradeHeader;
-import com.rhe.trading.agg.model.etrm.EtrmTradeHeaderKey;
-import com.rhe.trading.agg.model.etrm.EtrmTradeLeg;
-import com.rhe.trading.agg.model.etrm.EtrmTradeLegKey;
+import com.rhe.trading.agg.model.etrm.*;
 import io.quarkus.kafka.client.serialization.ObjectMapperSerde;
 import org.apache.kafka.common.serialization.Serde;
+import org.apache.kafka.common.serialization.Serdes;
+import org.apache.kafka.streams.KeyValue;
 import org.apache.kafka.streams.StreamsBuilder;
 import org.apache.kafka.streams.Topology;
-import org.apache.kafka.streams.kstream.Consumed;
-import org.apache.kafka.streams.kstream.KTable;
+import org.apache.kafka.streams.kstream.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -37,13 +35,29 @@ public class TopologyProducer {
     public Topology produce() {
         StreamsBuilder streamsBuilder = new StreamsBuilder();
 
-        KTable<EtrmTradeHeaderKey, EtrmTradeHeader> etrmTradeHeaderKTable = streamsBuilder.table("etrm.public.trade_header", Consumed.with(etrmTradeHeaderKeySerde, etrmTradeHeaderSerde));
-        etrmTradeHeaderKTable.toStream().peek((k, v) -> LOGGER.info("{}, {}", k, v));
+        KStream<Integer, EtrmTradeHeader> etrmTradeHeaderKStream = streamsBuilder.stream("etrm.public.trade_header", Consumed.with(etrmTradeHeaderKeySerde, etrmTradeHeaderSerde))
+                .map((k, v) -> new KeyValue<>(k.tradeId(), v))
+                .peek((k, v) -> LOGGER.info("HEADER: {}, {}", k, v));
 
-        KTable<EtrmTradeLegKey, EtrmTradeLeg> etrmTradeLegKTable = streamsBuilder.table("etrm.public.trade_leg", Consumed.with(etrmTradeLegKeySerde, etrmTradeLegSerde));
-        etrmTradeLegKTable.toStream().peek((k, v) -> LOGGER.info("{}, {}", k, v));
 
-        Serde<EtrmTradeLegAndEtrmTradeHeader> etrmTradeLegAndEtrmTradeHeaderSerde = new ObjectMapperSerde<>(EtrmTradeLegAndEtrmTradeHeader.class);
+        KStream<Integer, EtrmTradeLeg> etrmTradeLegKStream = streamsBuilder.stream("etrm.public.trade_leg", Consumed.with(etrmTradeLegKeySerde, etrmTradeLegSerde))
+                .map((k, v) -> new KeyValue<>(k.tradeLegId(), v))
+                .peek((k, v) -> LOGGER.info("LEG: {}, {}", k, v));
+
+        Serde<EtrmTradeLegs> etrmTradeLegsSerde = new ObjectMapperSerde<>(EtrmTradeLegs.class);
+
+        KGroupedTable<Integer, EtrmTradeLeg> etrmTradeLegKGroupedTable = etrmTradeLegKStream.toTable(Materialized.with(Serdes.Integer(), etrmTradeLegSerde))
+                .groupBy((integer, etrmTradeLeg) -> new KeyValue<>(etrmTradeLeg.tradeId(), etrmTradeLeg), Grouped.with(Serdes.Integer(), etrmTradeLegSerde));
+
+        KTable<Integer, EtrmTradeLegs> agg = etrmTradeLegKGroupedTable.aggregate(
+                () -> new EtrmTradeLegs(),
+                (key, value, aggregate) -> aggregate.update(value),
+                (key, value, aggregate) -> aggregate.update(value),
+                Materialized.with(Serdes.Integer(), etrmTradeLegsSerde)
+        );
+
+        agg.toStream().peek((k, v) -> LOGGER.info("AGG: {}, {}", k, v));
+
 
         return streamsBuilder.build();
     }
