@@ -77,10 +77,21 @@ public class TopologyProducer {
                 .toTable(Materialized.with(Serdes.Integer(), etrmTradeLegSerde))
                 .groupBy((tradeLegId, etrmTradeLeg) -> new KeyValue<>(this.getTradeIdFromMap(tradeLegId), etrmTradeLeg), Grouped.with(Serdes.Integer(), etrmTradeLegSerde));
 
+
+        Aggregator<Integer, EtrmTradeLeg, EtrmTradeLegs> adderAggregator = (tradeId, etrmTradeLeg, etrmTradeLegs) -> {
+            LOGGER.info("Aggregator: Adding {} to {}", etrmTradeLeg, etrmTradeLegs);
+            return etrmTradeLegs.update(etrmTradeLeg);
+        };
+
+        Aggregator<Integer, EtrmTradeLeg, EtrmTradeLegs> subtractorAggregator = (tradeId, etrmTradeLeg, etrmTradeLegs) -> {
+            LOGGER.info("Aggregator: Subtracting {} from {}", etrmTradeLeg, etrmTradeLegs);
+            return etrmTradeLegs.update(etrmTradeLeg);
+        };
+
         KTable<Integer, EtrmTradeLegs> agg = etrmTradeLegKGroupedTable.aggregate(
                 () -> new EtrmTradeLegs(),
-                (key, value, aggregate) -> aggregate.update(value),
-                (key, value, aggregate) -> aggregate.remove(value),
+                adderAggregator,
+                subtractorAggregator,
                 Materialized.with(Serdes.Integer(), etrmTradeLegsSerde)
         );
         agg.toStream().peek((k, v) -> LOGGER.info("LEGAGG: {}, {}", k, v));
@@ -88,12 +99,15 @@ public class TopologyProducer {
         Serde<Trade> tradeSerde = new ObjectMapperSerde<>(Trade.class);
         KTable<Integer, Trade> tradeKTable = etrmTradeHeaderKStream.toTable(Materialized.with(Serdes.Integer(), etrmTradeHeaderSerde)).join(
                 agg,
-                (header, legs) -> this.createTrade(header, legs),
+                (header, legs) -> {
+                    Trade trade = header.op().equals("d") ? null : this.createTrade(header, legs);
+                    return trade;
+                },
                 Materialized.with(Serdes.Integer(), tradeSerde)
         );
-        tradeKTable.toStream().peek((k, v) -> LOGGER.info("TRADE: {}, {}", k, v));
-
-        tradeKTable.toStream().to("trade", Produced.with(Serdes.Integer(), tradeSerde));
+        tradeKTable.toStream()
+                .peek((k, v) -> LOGGER.info("TRADE: {}, {}", k, v))
+                .to("trade", Produced.with(Serdes.Integer(), tradeSerde));
 
         return streamsBuilder.build();
     }

@@ -130,13 +130,13 @@ COMMIT;
 INSERT INTO trade_leg values (109, 107, 1, 2, 1, 1, 3.92, 1, 10000, 1);
 ```
 ```
-UPDATE trade_leg SET price = 3.85 WHERE trade_leg_id = 110;
+UPDATE trade_leg SET price = 3.85 WHERE trade_leg_id = 121;
 ```
 ```
 UPDATE trade_header SET start_date = CURRENT_DATE - 29 WHERE trade_id = 107;
 ```
 ```
-DELETE FROM trade_leg WHERE trade_leg_id = 108;
+DELETE FROM trade_leg WHERE trade_leg_id = 121;
 ```
 
 
