@@ -4,5 +4,8 @@ quarkus:
   kafka-streams:
     topics: etrm.transaction,etrm.public.trade_header,etrm.public.trade_header
     bootstrap-servers: localhost:9094
+    auto:
+      offset:
+        reset: earliest
     state:
       dir: /tmp/kstreams

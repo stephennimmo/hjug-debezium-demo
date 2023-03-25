@@ -1,56 +1,43 @@
 package com.rhe.trading.agg.model.etrm;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Optional;
-import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.Map;
 
 public class EtrmTradeLegs {
 
-    private List<EtrmTradeLeg> etrmTradeLegs = new CopyOnWriteArrayList<>();
+    private static final Logger logger = LoggerFactory.getLogger(EtrmTradeLegs.class);
 
-    public EtrmTradeLegs remove(EtrmTradeLeg etrmTradeLeg) {
-        Optional<EtrmTradeLeg> optional = getByTradeLegId(etrmTradeLeg.tradeLegId());
-        if (optional.isPresent()) {
-            etrmTradeLegs.remove(optional.get());
+    @JsonProperty
+    private Map<Integer, EtrmTradeLeg> etrmTradeLegMap = new LinkedHashMap<>();
+
+    public EtrmTradeLegs update(TradeAndLeg tradeAndLeg) {
+        logger.info("Before: {}", etrmTradeLegMap);
+        if (tradeAndLeg.getEtrmTradeLeg() != null) {
+            logger.info("Adding {} to map with key {}", tradeAndLeg.getEtrmTradeLeg(), tradeAndLeg.getEtrmTradeLeg().tradeLegId());
+            etrmTradeLegMap.put(tradeAndLeg.getEtrmTradeLeg().tradeLegId(), tradeAndLeg.getEtrmTradeLeg());
+        } else {
+            logger.info("Removing key {}", tradeAndLeg.getTradeLegId());
+            etrmTradeLegMap.remove(tradeAndLeg.getTradeLegId());
         }
+        logger.info("After: {}", etrmTradeLegMap);
         return this;
-    }
-
-    public EtrmTradeLegs update(EtrmTradeLeg etrmTradeLeg) {
-        //CAN This be cleaned up?
-        switch (etrmTradeLeg.op()) {
-            case "c" -> {
-                etrmTradeLegs.add(etrmTradeLeg);
-            }
-            case "u" -> {
-                Optional<EtrmTradeLeg> optional = getByTradeLegId(etrmTradeLeg.tradeLegId());
-                if (optional.isPresent()) {
-                    etrmTradeLegs.remove(optional.get());
-                }
-                etrmTradeLegs.add(etrmTradeLeg);
-            }
-            case "d" -> {
-                Optional<EtrmTradeLeg> optional = getByTradeLegId(etrmTradeLeg.tradeLegId());
-                if (optional.isPresent()) {
-                    etrmTradeLegs.remove(optional.get());
-                }
-            }
-        }
-        return this;
-    }
-
-    private Optional<EtrmTradeLeg> getByTradeLegId(int tradeLegId) {
-        return this.etrmTradeLegs.stream().filter(l -> l.tradeLegId() == tradeLegId).findFirst();
     }
 
     public List<EtrmTradeLeg> getEtrmTradeLegs() {
-        return etrmTradeLegs;
+        return new ArrayList<>(this.etrmTradeLegMap.values());
     }
 
     @Override
     public String toString() {
         return "EtrmTradeLegs{" +
-                "etrmTradeLegs=" + etrmTradeLegs +
+                "etrmTradeLegMap=" + etrmTradeLegMap +
                 '}';
     }
+
 }

@@ -47,7 +47,7 @@ We are going to start a Podman compose file containing the following:
 To get this started, use the following command: 
 
 ```
-podman-compose up
+podman-compose up -d 
 ```
 
 Notice we didn't add the `-d` argument. We want to keep an eye on what is happening. 
@@ -61,6 +61,8 @@ STOP: Go create the transaction topic...
 ```
 kcctl apply -f etrm-connector.json
 ```
+
+# "message.key.columns": "public.trade_header:trade_id;public.trade_leg:trade_leg_id",
 
 Any time you reapply the connector config, you have to restart the connector.  
 ```
@@ -91,7 +93,11 @@ bin/kafka-topics.sh --bootstrap-server localhost:9092 --list
 bin/kafka-topics.sh --bootstrap-server localhost:9092 --topic etrm.* --describe
 ```
 ```
+bin/kafka-console-consumer.sh --bootstrap-server localhost:9092 --whitelist '.*etrm.public.trade.*' --property print.key=true --from-beginning 
+
 bin/kafka-console-consumer.sh --bootstrap-server localhost:9092 --whitelist '.*etrm.*' --property print.key=true
+
+bin/kafka-console-consumer.sh --bootstrap-server localhost:9092 --whitelist 'trade' --property print.key=true --from-beginning 
 
 # --from-beginning 
 ```
