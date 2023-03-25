@@ -144,6 +144,12 @@ UPDATE trade_header SET start_date = CURRENT_DATE - 29 WHERE trade_id = 107;
 ```
 DELETE FROM trade_leg WHERE trade_leg_id = 121;
 ```
+```
+BEGIN;
+DELETE FROM trade_leg where trade_id = 130;
+DELETE FROM trade_header where trade_id = 130;
+COMMIT;
+```
 
 
 # Cleanup

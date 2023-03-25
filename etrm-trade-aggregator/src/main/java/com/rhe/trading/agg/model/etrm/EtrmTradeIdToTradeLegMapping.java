@@ -4,22 +4,22 @@ import io.debezium.data.Envelope;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class TradeAndLeg {
+public class EtrmTradeIdToTradeLegMapping {
 
-    private static final Logger logger = LoggerFactory.getLogger(TradeAndLeg.class);
+    private static final Logger logger = LoggerFactory.getLogger(EtrmTradeIdToTradeLegMapping.class);
 
     private int tradeLegId;
     private int tradeId;
     private EtrmTradeLeg etrmTradeLeg;
 
-    public TradeAndLeg update(int tradeLegId, int tradeId, EtrmTradeLeg etrmTradeLeg) {
-        logger.info("Before: {}, {}, {}", this.tradeLegId, this.tradeId, this.etrmTradeLeg);
+    public EtrmTradeIdToTradeLegMapping update(int tradeLegId, int tradeId, EtrmTradeLeg etrmTradeLeg) {
+        logger.info("Update - Before: {}, {}, {}", this.tradeLegId, this.tradeId, this.etrmTradeLeg);
         this.tradeLegId = tradeLegId;
         if (!etrmTradeLeg.op().equals(Envelope.Operation.DELETE.code())) {
             this.tradeId = tradeId;
         }
         this.etrmTradeLeg = etrmTradeLeg.op().equals(Envelope.Operation.DELETE.code()) ? null : etrmTradeLeg;
-        logger.info("After: {}, {}, {}", this.tradeLegId, this.tradeId, this.etrmTradeLeg);
+        logger.info("Update - After: {}, {}, {}", this.tradeLegId, this.tradeId, this.etrmTradeLeg);
         return this;
     }
 

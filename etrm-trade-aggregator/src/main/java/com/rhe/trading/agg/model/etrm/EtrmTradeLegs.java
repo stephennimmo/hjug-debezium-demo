@@ -1,13 +1,11 @@
 package com.rhe.trading.agg.model.etrm;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.ArrayList;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 public class EtrmTradeLegs {
 
@@ -16,21 +14,26 @@ public class EtrmTradeLegs {
     @JsonProperty
     private Map<Integer, EtrmTradeLeg> etrmTradeLegMap = new LinkedHashMap<>();
 
-    public EtrmTradeLegs update(TradeAndLeg tradeAndLeg) {
-        logger.info("Before: {}", etrmTradeLegMap);
-        if (tradeAndLeg.getEtrmTradeLeg() != null) {
-            logger.info("Adding {} to map with key {}", tradeAndLeg.getEtrmTradeLeg(), tradeAndLeg.getEtrmTradeLeg().tradeLegId());
-            etrmTradeLegMap.put(tradeAndLeg.getEtrmTradeLeg().tradeLegId(), tradeAndLeg.getEtrmTradeLeg());
+    public EtrmTradeLegs update(EtrmTradeIdToTradeLegMapping mapping) {
+        logger.info("Before Keys: {}", getKeys());
+        if (mapping.getEtrmTradeLeg() != null) {
+            logger.info("Adding {} to map with key {}", mapping.getEtrmTradeLeg(), mapping.getEtrmTradeLeg().tradeLegId());
+            etrmTradeLegMap.put(mapping.getEtrmTradeLeg().tradeLegId(), mapping.getEtrmTradeLeg());
         } else {
-            logger.info("Removing key {}", tradeAndLeg.getTradeLegId());
-            etrmTradeLegMap.remove(tradeAndLeg.getTradeLegId());
+            logger.info("Removing key {}", mapping.getTradeLegId());
+            etrmTradeLegMap.remove(mapping.getTradeLegId());
         }
-        logger.info("After: {}", etrmTradeLegMap);
+        logger.info("After Keys: {}", getKeys());
         return this;
     }
 
     public List<EtrmTradeLeg> getEtrmTradeLegs() {
         return new ArrayList<>(this.etrmTradeLegMap.values());
+    }
+
+    @JsonIgnore
+    public Set<Integer> getKeys() {
+        return this.etrmTradeLegMap.keySet();
     }
 
     @Override

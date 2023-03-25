@@ -28,9 +28,10 @@ public class TopologyProducer {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(TopologyProducer.class);
 
-    private final List<String> TRADE_TABLES = List.of("public.trade_header", "public.trade_leg");
+    private final String TOPIC_ETRM_TRANSACTION = "etrm.transaction";
     private final String TOPIC_ETRM_TRADE_HEADER = "etrm.public.trade_header";
     private final String TOPIC_ETRM_TRADE_LEG = "etrm.public.trade_leg";
+    private final List<String> TRADE_TABLES = List.of("public.trade_header", "public.trade_leg");
 
     private final Serde<EtrmTransaction> etrmTransactionSerde;
     private final Serde<EtrmTradeHeaderKey> etrmTradeHeaderKeySerde;
@@ -52,53 +53,66 @@ public class TopologyProducer {
     public Topology produce() {
         StreamsBuilder streamsBuilder = new StreamsBuilder();
 
+        KStream<String, EtrmTransaction> etrmTransactionKStream = streamsBuilder.stream(TOPIC_ETRM_TRANSACTION, Consumed.with(Serdes.String(), etrmTransactionSerde))
+                .peek((k, v) -> LOGGER.debug("ALLTXN: {}, {}", k, v))
+                .filter((k, v) -> v.status().equals("END"))
+                .filter((k, v) -> v.dataCollections().stream().filter(dc -> TRADE_TABLES.contains(dc.dataCollection())).count() > 0)
+                .peek((k, v) -> LOGGER.debug("FILTXN: {}, {}", k, v));
+
         KTable<Integer, EtrmTradeHeader> etrmTradeHeaderKTable = streamsBuilder.stream(TOPIC_ETRM_TRADE_HEADER, Consumed.with(etrmTradeHeaderKeySerde, etrmTradeHeaderSerde).withOffsetResetPolicy(Topology.AutoOffsetReset.EARLIEST))
                 .map((k, v) -> KeyValue.pair(k.tradeId(), v))
-                .peek((k, v) -> LOGGER.info("HEADER: {}, {}", k, v))
-                .toTable(Materialized.as("etrmTradeHeaderKTable").with(Serdes.Integer(), etrmTradeHeaderSerde));
+                .peek((k, v) -> LOGGER.debug("HEADER: {}, {}", k, v))
+                .toTable(Materialized.as("etrm-trade-header-table").with(Serdes.Integer(), etrmTradeHeaderSerde));
 
         KTable<Integer, EtrmTradeLeg> etrmTradeLegKTable = streamsBuilder.stream(TOPIC_ETRM_TRADE_LEG, Consumed.with(etrmTradeLegKeySerde, etrmTradeLegSerde).withOffsetResetPolicy(Topology.AutoOffsetReset.EARLIEST))
                 .map((k, v) -> KeyValue.pair(k.tradeLegId(), v))
-                .peek((k, v) -> LOGGER.info("LEG: {}, {}", k, v))
-                .toTable(Materialized.as("etrmTradeLegKTable").with(Serdes.Integer(), etrmTradeLegSerde));
+                .peek((k, v) -> LOGGER.debug("LEG: {}, {}", k, v))
+                .toTable(Materialized.as("etrm-trade-leg-table").with(Serdes.Integer(), etrmTradeLegSerde));
 
-        Serde<TradeAndLeg> tradeAndLegSerde = new ObjectMapperSerde<>(TradeAndLeg.class);
-        KTable<Integer, TradeAndLeg> tradeAndLegKTable = etrmTradeLegKTable.toStream().groupByKey(Grouped.with(Serdes.Integer(), etrmTradeLegSerde))
+        Serde<EtrmTradeIdToTradeLegMapping> etrmTradeIdToTradeLegMappingSerde = new ObjectMapperSerde<>(EtrmTradeIdToTradeLegMapping.class);
+        KTable<Integer, EtrmTradeIdToTradeLegMapping> etrmTradeIdToTradeLegMappingKTable = etrmTradeLegKTable.toStream().groupByKey(Grouped.with(Serdes.Integer(), etrmTradeLegSerde))
                 .aggregate(
-                        () -> new TradeAndLeg(),
-                        (tradeLegId, etrmTradeLeg, tradeAndLeg) -> tradeAndLeg.update(tradeLegId, etrmTradeLeg.tradeId(), etrmTradeLeg),
-                        Materialized.<Integer, TradeAndLeg, KeyValueStore<Bytes, byte[]>>
-                                        as("tradeAndLegKTable")
+                        () -> new EtrmTradeIdToTradeLegMapping(),
+                        (tradeLegId, etrmTradeLeg, etrmTradeIdToTradeLegMapping) -> etrmTradeIdToTradeLegMapping.update(tradeLegId, etrmTradeLeg.tradeId(), etrmTradeLeg),
+                        Materialized.<Integer, EtrmTradeIdToTradeLegMapping, KeyValueStore<Bytes, byte[]>>
+                                        as("etrm-trade-id-to-trade-leg-mapping-table")
                                 .withKeySerde(Serdes.Integer())
-                                .withValueSerde(tradeAndLegSerde)
+                                .withValueSerde(etrmTradeIdToTradeLegMappingSerde)
                 );
+        etrmTradeIdToTradeLegMappingKTable.toStream().peek((k, v) -> LOGGER.debug("MAPPING: {}, {}", k, v));
 
         Serde<EtrmTradeLegs> etrmTradeLegsSerde = new ObjectMapperSerde<>(EtrmTradeLegs.class);
-        KTable<Integer, EtrmTradeLegs> etrmTradeLegsKTable = tradeAndLegKTable.toStream()
+        KTable<Integer, EtrmTradeLegs> etrmTradeLegsKTable = etrmTradeIdToTradeLegMappingKTable.toStream()
                 .map((key, value) -> KeyValue.pair(value.getTradeId(), value))
-                .groupByKey(Grouped.with(Serdes.Integer(), tradeAndLegSerde))
+                .groupByKey(Grouped.with(Serdes.Integer(), etrmTradeIdToTradeLegMappingSerde))
                 .aggregate(
                         () -> new EtrmTradeLegs(),
                         (key, value, aggregate) -> aggregate.update(value),
                         Materialized.<Integer, EtrmTradeLegs, KeyValueStore<Bytes, byte[]>>
-                                        as("etrmTradeLegsKTable")
+                                        as("etrm-trade-legs-table")
                                 .withKeySerde(Serdes.Integer())
                                 .withValueSerde(etrmTradeLegsSerde)
                 );
+        etrmTradeLegsKTable.toStream().peek((k, v) -> LOGGER.debug("LEGAGG: {}, {}", k, v));
 
         Serde<Trade> tradeSerde = new ObjectMapperSerde<>(Trade.class);
-        KTable<Integer, Trade> tradeKTable = etrmTradeHeaderKTable.join(etrmTradeLegsKTable, (value1, value2) -> {
-            return value1.op().equals(Envelope.Operation.DELETE.code()) ? null : this.createTrade(value1, value2);
-        });
-
-        tradeKTable.toStream()
-                .peek((k, v) -> LOGGER.info("TRADE: {}, {}", k, v))
-                .to("trade", Produced.with(Serdes.Integer(), tradeSerde));
+        etrmTradeHeaderKTable.join(
+                        etrmTradeLegsKTable,
+                        (value1, value2) -> this.createTrade(value1, value2),
+                        Materialized.<Integer, Trade, KeyValueStore<Bytes, byte[]>>
+                                        as("trade-table")
+                                .withKeySerde(Serdes.Integer())
+                                .withValueSerde(tradeSerde)
+                ).toStream()
+                .peek((k, v) -> LOGGER.debug("TRADE: {}, {}", k, v)).to("trade", Produced.with(Serdes.Integer(), tradeSerde));
 
         return streamsBuilder.build();
     }
 
     private Trade createTrade(EtrmTradeHeader etrmTradeHeader, EtrmTradeLegs etrmTradeLegs) {
+        if (etrmTradeHeader.op().equals(Envelope.Operation.DELETE.code())) {
+            return null;
+        }
         List<TradeLeg> tradeLegs = etrmTradeLegs.getEtrmTradeLegs().stream().map(this::createTradeLeg).collect(Collectors.toList());
         return new Trade(etrmTradeHeader.tradeId(), LocalDate.ofEpochDay(etrmTradeHeader.startDate()), LocalDate.ofEpochDay(etrmTradeHeader.endDate()),
                 Instant.ofEpochMilli(etrmTradeHeader.executionTimestamp()), etrmTradeHeader.tradeTypeId(), tradeLegs);
