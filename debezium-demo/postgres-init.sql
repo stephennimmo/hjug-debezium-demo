@@ -61,6 +61,7 @@ CREATE TABLE trade_header
     FOREIGN KEY (trade_type_id) REFERENCES trade_type (trade_type_id)
 );
 ALTER SEQUENCE trade_header_trade_id_seq RESTART WITH 100;
+ALTER TABLE trade_header REPLICA IDENTITY FULL;
 
 CREATE TABLE trade_leg
 (
@@ -83,6 +84,7 @@ CREATE TABLE trade_leg
     FOREIGN KEY (quantity_uom_id) REFERENCES uom (uom_id)
 );
 ALTER SEQUENCE trade_leg_trade_leg_id_seq RESTART WITH 100;
+ALTER TABLE trade_leg REPLICA IDENTITY FULL;
 
 -- Insert Temp Data
 
