@@ -69,25 +69,13 @@ public class TopologyProducer {
                 .peek((k, v) -> LOGGER.debug("LEG: {}, {}", k, v))
                 .toTable(Materialized.as("etrm-trade-leg-table").with(Serdes.Integer(), etrmTradeLegSerde));
 
-        Serde<EtrmTradeIdToTradeLegMapping> etrmTradeIdToTradeLegMappingSerde = new ObjectMapperSerde<>(EtrmTradeIdToTradeLegMapping.class);
-        KTable<Integer, EtrmTradeIdToTradeLegMapping> etrmTradeIdToTradeLegMappingKTable = etrmTradeLegKTable.toStream().groupByKey(Grouped.with(Serdes.Integer(), etrmTradeLegSerde))
-                .aggregate(
-                        () -> new EtrmTradeIdToTradeLegMapping(),
-                        (tradeLegId, etrmTradeLeg, etrmTradeIdToTradeLegMapping) -> etrmTradeIdToTradeLegMapping.update(tradeLegId, etrmTradeLeg.tradeId(), etrmTradeLeg),
-                        Materialized.<Integer, EtrmTradeIdToTradeLegMapping, KeyValueStore<Bytes, byte[]>>
-                                        as("etrm-trade-id-to-trade-leg-mapping-table")
-                                .withKeySerde(Serdes.Integer())
-                                .withValueSerde(etrmTradeIdToTradeLegMappingSerde)
-                );
-        etrmTradeIdToTradeLegMappingKTable.toStream().peek((k, v) -> LOGGER.debug("MAPPING: {}, {}", k, v));
-
         Serde<EtrmTradeLegs> etrmTradeLegsSerde = new ObjectMapperSerde<>(EtrmTradeLegs.class);
-        KTable<Integer, EtrmTradeLegs> etrmTradeLegsKTable = etrmTradeIdToTradeLegMappingKTable.toStream()
-                .map((key, value) -> KeyValue.pair(value.getTradeId(), value))
-                .groupByKey(Grouped.with(Serdes.Integer(), etrmTradeIdToTradeLegMappingSerde))
+        KTable<Integer, EtrmTradeLegs> etrmTradeLegsKTable = etrmTradeLegKTable.toStream()
+                .map((integer, etrmTradeLeg) -> KeyValue.pair(etrmTradeLeg.tradeId(), etrmTradeLeg))
+                .groupByKey(Grouped.with(Serdes.Integer(), etrmTradeLegSerde))
                 .aggregate(
                         () -> new EtrmTradeLegs(),
-                        (key, value, aggregate) -> aggregate.update(value),
+                        (integer, etrmTradeLeg, etrmTradeLegs) -> etrmTradeLegs.update(etrmTradeLeg),
                         Materialized.<Integer, EtrmTradeLegs, KeyValueStore<Bytes, byte[]>>
                                         as("etrm-trade-legs-table")
                                 .withKeySerde(Serdes.Integer())
@@ -98,7 +86,7 @@ public class TopologyProducer {
         Serde<Trade> tradeSerde = new ObjectMapperSerde<>(Trade.class);
         etrmTradeHeaderKTable.join(
                         etrmTradeLegsKTable,
-                        (value1, value2) -> this.createTrade(value1, value2),
+                        (etrmTradeHeader, etrmTradeLegs) -> this.createTrade(etrmTradeHeader, etrmTradeLegs),
                         Materialized.<Integer, Trade, KeyValueStore<Bytes, byte[]>>
                                         as("trade-table")
                                 .withKeySerde(Serdes.Integer())

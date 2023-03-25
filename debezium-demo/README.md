@@ -146,8 +146,8 @@ DELETE FROM trade_leg WHERE trade_leg_id = 121;
 ```
 ```
 BEGIN;
-DELETE FROM trade_leg where trade_id = 130;
-DELETE FROM trade_header where trade_id = 130;
+DELETE FROM trade_leg where trade_id = 103;
+DELETE FROM trade_header where trade_id = 103;
 COMMIT;
 ```
 
