@@ -92,7 +92,8 @@ public class TopologyProducer {
                                 .withKeySerde(Serdes.Integer())
                                 .withValueSerde(tradeSerde)
                 ).toStream()
-                .peek((k, v) -> LOGGER.debug("TRADE: {}, {}", k, v)).to("trade", Produced.with(Serdes.Integer(), tradeSerde));
+                .peek((k, v) -> LOGGER.debug("TRADE: {}, {}", k, v))
+                .to("trade", Produced.with(Serdes.Integer(), tradeSerde));
 
         return streamsBuilder.build();
     }
